@@ -67,7 +67,7 @@ public class MemSQLSinkConfig extends AbstractConfig {
 
     public static final String METADATA_TABLE_NAME = "memsql.metadata.table";
     private static final String METADATA_TABLE_NAME_DOCS = "Specify the name of an additional meta-table to save the recording results " +
-                                                            "(default: `kafka-connect-transaction-metadata`)";
+            "(default: `kafka-connect-transaction-metadata`)";
     private static final String METADATA_TABLE_NAME_DISPLAY = "Metadata table name";
 
     public static final String TABLE_NAME = "memsql.tableName.<topicName>";
@@ -241,12 +241,9 @@ public class MemSQLSinkConfig extends AbstractConfig {
         this.metadataTableName = getString(METADATA_TABLE_NAME);
         this.topicToTableMap = getTopicToTableMap(props);
 
-        try {
-            JdbcHelper.getDDLConnection(this);
-            JdbcHelper.getDMLConnection(this);
-        } catch (SQLException ex) {
-            throw new ConfigException(ex.getLocalizedMessage());
-        }
+        JdbcHelper.getDDLConnection(this);
+        JdbcHelper.getDMLConnection(this);
+
     }
 
     private DataCompression getDataCompression() {
@@ -280,7 +277,7 @@ public class MemSQLSinkConfig extends AbstractConfig {
             throw new ConfigException(String.format("Configuration \"tableKey\" is wrong. Column name %s is escaped incorrectly", column));
         }
 
-        return column.substring(1, column.length() -1).replace("``", "`");
+        return column.substring(1, column.length() - 1).replace("``", "`");
     }
 
     private List<String> splitColumnNames(String columns) {
@@ -318,7 +315,7 @@ public class MemSQLSinkConfig extends AbstractConfig {
                 .filter(key -> key.startsWith(tableKeysPrefix))
                 .forEach(
                         key -> {
-                            String[]keyParts = key.split("\\.", 3);
+                            String[] keyParts = key.split("\\.", 3);
                             if (keyParts.length < 2) {
                                 throw new ConfigException(
                                         String.format("Options starting with '%s.' must be formatted correctly. The key should be in the form `%s<index_type>[.<name>]`.", tableKeysPrefix, tableKeysPrefix)
@@ -328,7 +325,7 @@ public class MemSQLSinkConfig extends AbstractConfig {
                             TableKey.Type keyType;
                             try {
                                 keyType = TableKey.Type.valueOf(keyParts[1].toUpperCase());
-                            } catch(IllegalArgumentException ex) {
+                            } catch (IllegalArgumentException ex) {
                                 throw new ConfigException(
                                         String.format("Option '%s' must specify an index type from the following options: %s", key, Arrays.toString(TableKey.Type.values()))
                                 );

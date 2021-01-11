@@ -84,26 +84,30 @@ public class EscapingTest extends IntegrationBase {
 
     @Test
     public void metadataRecordExists() {
+        Connection conn = JdbcHelper.getDDLConnection(conf);
         try {
-            Connection conn = JdbcHelper.getDDLConnection(conf);
             assertTrue(JdbcHelper.metadataRecordExists(conn, weirdName + "-0-0", conf));
             assertFalse(JdbcHelper.metadataRecordExists(conn, "nonexistent metadata record", conf));
         } catch (Exception e) {
             log.error("", e);
             fail("Should not have thrown any exception");
+        } finally {
+            JdbcHelper.releaseDDLConnection(conn);
         }
     }
 
     @Test
     public void tableExists() {
+        Connection conn = JdbcHelper.getDDLConnection(conf);
         try {
-            Connection conn = JdbcHelper.getDDLConnection(conf);
             assertTrue(JdbcHelper.tableExists(conn, weirdName));
             assertTrue(JdbcHelper.tableExists(conn, weirdMetadataName));
             assertFalse(JdbcHelper.tableExists(conn, "nonexistent table"));
         } catch (Exception e) {
             log.error("", e);
             fail("Should not have thrown any exception");
+        } finally {
+            JdbcHelper.releaseDDLConnection(conn);
         }
     }
 

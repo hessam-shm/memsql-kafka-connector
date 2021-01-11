@@ -8,16 +8,38 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.sql.*;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 public class JdbcHelper {
 
     private static final Logger log = LoggerFactory.getLogger(JdbcHelper.class);
+    private static final int POOL_SIZE = 20;
+
+    private static List<Connection> DDLPool = new ArrayList<>(POOL_SIZE);
+    private static List<Connection> DDLUsedConnections = new ArrayList<>();
+    private static List<Connection> DMLPool = new ArrayList<>(POOL_SIZE);
+    private static List<Connection> DMLUsedConnections = new ArrayList<>();
+
+    public static void populateMemSQLConnectionPools(MemSQLSinkConfig confs) {
+        for (int i = 0; i < DDLPool.size(); i++) {
+            try {
+                DDLPool.set(i, getConnection(Arrays.asList(confs.ddlEndpoint), confs));
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+            }
+        }
+        for (int i = 0; i < DMLPool.size(); i++) {
+            try {
+                DMLPool.set(i, getConnection(confs.dmlEndpoints, confs));
+            } catch (SQLException throwables) {
+                throwables.printStackTrace();
+            }
+        }
+    }
 
     public static void createTableIfNeeded(MemSQLSinkConfig config, String table, Schema schema) throws SQLException {
-        try (Connection connection = getDDLConnection(config)) {
+        Connection connection = getDDLConnection(config);
+        try {
             boolean tableExists = JdbcHelper.tableExists(connection, table);
             if (!tableExists) {
                 log.info(String.format("Table `%s` doesn't exist. Creating it", table));
@@ -30,6 +52,8 @@ public class JdbcHelper {
                     JdbcHelper.createTable(connection, config.metadataTableName, MemSQLDialect.getKafkaMetadataSchema());
                 }
             }
+        } finally {
+            releaseDDLConnection(connection);
         }
     }
 
@@ -71,8 +95,8 @@ public class JdbcHelper {
 
     public static boolean isReferenceTable(MemSQLSinkConfig config, String table) {
         String database = config.database;
-        try (Connection connection = getDDLConnection(config);
-             PreparedStatement stmt = MemSQLDialect.showExtendedTables(connection, database, table)) {
+        Connection connection = getDDLConnection(config);
+        try(PreparedStatement stmt = MemSQLDialect.showExtendedTables(connection, database, table)) {
             log.trace("Executing SQL:\n{}", stmt);
             ResultSet resultSet = stmt.executeQuery();
             if (resultSet.next()) {
@@ -82,15 +106,33 @@ public class JdbcHelper {
             }
         } catch (SQLException ex) {
             return false;
+        } finally {
+            releaseDDLConnection(connection);
         }
     }
 
-    public static Connection getDDLConnection(MemSQLSinkConfig config) throws SQLException {
-        return getConnection(Collections.singletonList(config.ddlEndpoint), config);
+    public static Connection getDDLConnection(MemSQLSinkConfig config)/* throws SQLException*/ {
+        //return getConnection(Collections.singletonList(config.ddlEndpoint), config);
+        Connection connection = DDLPool.remove(DDLPool.size() - 1);
+        DDLUsedConnections.add(connection);
+        return connection;
     }
 
-    public static Connection getDMLConnection(MemSQLSinkConfig config) throws SQLException {
-        return getConnection(config.dmlEndpoints, config);
+    public static boolean releaseDDLConnection(Connection connection) {
+        DDLPool.add(connection);
+        return DDLUsedConnections.remove(connection);
+    }
+
+    public static Connection getDMLConnection(MemSQLSinkConfig config) /*throws SQLException*/ {
+        //return getConnection(config.dmlEndpoints, config);
+        Connection connection = DMLPool.remove(DMLPool.size() - 1);
+        DMLUsedConnections.add(connection);
+        return connection;
+    }
+
+    public static boolean releaseDMLConnection(Connection connection) {
+        DMLPool.add(connection);
+        return DMLUsedConnections.remove(connection);
     }
 
     private static Connection getConnection(List<String> hosts, MemSQLSinkConfig config) throws SQLException {

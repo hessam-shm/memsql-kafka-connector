@@ -1,5 +1,6 @@
 package com.memsql.kafka.sink;
 
+import com.memsql.kafka.utils.JdbcHelper;
 import com.memsql.kafka.utils.VersionProvider;
 import org.apache.kafka.connect.errors.ConnectException;
 import org.apache.kafka.connect.errors.RetriableException;
@@ -20,10 +21,12 @@ public class MemSQLSinkTask extends SinkTask {
     private MemSQLDbWriter writer;
     private int retriesLeft;
 
+
     @Override
     public void start(Map<String, String> props) {
         log.info("Starting MemSQL Sink Task");
         this.config = new MemSQLSinkConfig(props);
+        JdbcHelper.populateMemSQLConnectionPools(config);
         this.writer = new MemSQLDbWriter(config);
         this.retriesLeft = config.maxRetries;
     }
